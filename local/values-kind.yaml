@@ -1,0 +1,17 @@
+# Overrides for the local Kind cluster created by `make cluster`.
+fleet:
+  service:
+    type: NodePort
+    nodePort: 30443
+  tls:
+    selfSigned:
+      dnsNames:
+        - localhost
+        # Lets agents running in Docker on the same machine verify the server.
+        - host.docker.internal
+      ipAddresses:
+        - 127.0.0.1
+
+mysql:
+  persistence:
+    size: 2Gi

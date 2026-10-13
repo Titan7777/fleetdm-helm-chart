@@ -1,0 +1,10 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # Fleet NodePort -> https://localhost:8443 on the host. Bound to all
+      # interfaces so containers can reach it via host.docker.internal too.
+      - containerPort: 30443
+        hostPort: 8443
+        protocol: TCP
