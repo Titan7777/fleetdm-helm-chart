@@ -31,7 +31,7 @@ uninstall: ## Remove the release and everything it created
 
 verify: ca ## Check that Fleet, MySQL and Redis are operational
 	$(KUBECTL) rollout status deploy/$(RELEASE)-fleetdm --timeout 5m
-	$(KUBECTL) exec sts/$(RELEASE)-fleetdm-mysql -- sh -c 'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql -uroot -N -e "SELECT COUNT(*) FROM $$MYSQL_DATABASE.migration_status_tables"'
+	$(KUBECTL) exec sts/$(RELEASE)-fleetdm-mysql -- sh -c 'MYSQL_PWD="$$MYSQL_ROOT_PASSWORD" mysql -h 127.0.0.1 -uroot -N -e "SELECT COUNT(*) FROM $$MYSQL_DATABASE.migration_status_tables"'
 	$(KUBECTL) exec deploy/$(RELEASE)-fleetdm-redis -- redis-cli ping
 	$(HELM) test $(RELEASE)
 	curl -fsS --cacert $(CA_FILE) $(FLEET_URL)/healthz && echo "healthz ok"
