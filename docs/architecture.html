@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Innovate Inc. — Cloud Architecture Design</title>
+<style>
+  @page { size: A4; margin: 14mm 15mm; }
+  @page diagram { size: A4 landscape; margin: 10mm; }
+  body { font: 9.6pt/1.38 Helvetica, Arial, sans-serif; color: #111827; margin: 0; }
+  h1 { font-size: 17pt; margin: 0 0 2pt; }
+  h2 { font-size: 11.5pt; margin: 9pt 0 3pt; border-bottom: 1px solid #d1d5db; padding-bottom: 2pt; }
+  p { margin: 0 0 4pt; }
+  ul { margin: 0 0 4pt; padding-left: 14pt; }
+  li { margin-bottom: 1.5pt; }
+  .meta { color: #4b5563; margin-bottom: 6pt; }
+  table { border-collapse: collapse; width: 100%; margin: 3pt 0 5pt; }
+  th, td { border: 1px solid #d1d5db; padding: 2.5pt 5pt; text-align: left; vertical-align: top; }
+  th { background: #f3f4f6; }
+  .diagram { page: diagram; break-before: page; }
+  .diagram img { width: 100%; }
+</style>
+</head>
+<body>
+
+<h1>Innovate Inc. — Cloud Architecture Design</h1>
+<p class="meta">Flask REST API · React SPA · MongoDB · AWS with managed Kubernetes (EKS). The diagram is on the last page.</p>
+
+<p><b>Summary.</b> Run the API on EKS in a three-AZ VPC, serve the SPA from S3 behind CloudFront, and keep data in
+MongoDB Atlas reached over PrivateLink. Environments are isolated by AWS account. Everything is defined in Terraform
+and deployed through GitOps, so the same design costs a few hundred dollars a month today and scales to millions of
+users by raising limits, not by re-architecting.</p>
+
+<h2>1. Cloud environment structure</h2>
+<p><b>Provider: AWS.</b> GKE is an equally good Kubernetes service, so this is not a technical knock-out. AWS wins for a
+team with limited cloud experience on three practical points: the largest hiring pool and body of documentation,
+first-class MongoDB Atlas integration (PrivateLink, IAM authentication, Marketplace billing), and Karpenter for
+cost-efficient node scaling. If the founding team already knows GCP, the same design maps one-to-one onto GKE.</p>
+<p><b>Five accounts</b> in one AWS Organization, created with Control Tower:</p>
+<table>
+  <tr><th style="width:19%">Account</th><th>Purpose</th></tr>
+  <tr><td>Management</td><td>Consolidated billing, IAM Identity Center (SSO), service control policies. No workloads.</td></tr>
+  <tr><td>Security</td><td>Organization-wide CloudTrail, GuardDuty, Config and Security Hub; immutable log archive. Read-only for engineers.</td></tr>
+  <tr><td>Shared services</td><td>ECR registry, CI/CD roles, Terraform state, parent DNS zone.</td></tr>
+  <tr><td>Non-prod</td><td>Dev and staging as separate namespaces in one small cluster. Split into two accounts when the team grows.</td></tr>
+  <tr><td>Prod</td><td>Production workload and data access only. Changes arrive through the pipeline; human access is break-glass.</td></tr>
+</table>
+<p>The account is the strongest isolation boundary AWS offers: a mistake or compromised credential in dev cannot touch
+production data, per-environment cost shows up without tagging discipline, and guardrails (allowed regions, no public
+S3, no disabling CloudTrail) are enforced once at the organization level. Five is the minimum that gives this; more
+accounts would be overhead for a small team.</p>
+
+<h2>2. Network design</h2>
+<ul>
+  <li><b>One VPC per environment</b>, /16, across three AZs, with non-overlapping ranges so they can be peered later. Three subnet tiers per AZ:
+    <b>public</b> (ALB and NAT gateways only), <b>private app</b> (EKS nodes and pods), <b>private data</b> (VPC endpoints and the Atlas PrivateLink endpoint). Nothing in a private tier has a public IP.</li>
+  <li><b>Ingress:</b> Route 53 → CloudFront with AWS WAF (managed rule sets, rate limiting) → S3 for the SPA and → ALB for <code>/api/*</code>.
+    The ALB accepts traffic only from CloudFront. TLS everywhere with ACM certificates.</li>
+  <li><b>Egress:</b> NAT gateway per AZ in prod, a single one in non-prod. Traffic to ECR, S3, STS, CloudWatch and Secrets Manager stays on VPC endpoints, which is both safer and cheaper than NAT.</li>
+  <li><b>Segmentation:</b> security groups reference each other rather than CIDR ranges (ALB → nodes → endpoints). Inside the cluster, Kubernetes NetworkPolicies are default-deny per namespace, with explicit allows.</li>
+  <li><b>Control plane access:</b> the EKS API endpoint is private; engineers reach it through SSO and a client VPN, with no bastion hosts or SSH keys. VPC flow logs and GuardDuty (including EKS runtime monitoring) feed the Security account.</li>
+</ul>
+
+<h2>3. Compute platform</h2>
+<p><b>EKS</b> with managed add-ons and a pinned, regularly upgraded Kubernetes version; non-prod is upgraded first.</p>
+<ul>
+  <li><b>Node groups:</b> a small on-demand managed node group (2–3 nodes across AZs) runs only cluster-critical components. Application pods run on
+    <b>Karpenter</b> NodePools, which pick instance types to fit pending pods, mix spot with on-demand, prefer Graviton, and consolidate under-used nodes. Stateless API pods tolerate spot; a baseline stays on on-demand.</li>
+  <li><b>Scaling:</b> Horizontal Pod Autoscaler on CPU and request rate for the API (KEDA for queue-driven workers later). Vertical Pod Autoscaler runs in recommendation mode to right-size requests, not to resize live pods. Karpenter adds nodes within about a minute. At today's traffic this means two small API pods on two nodes.</li>
+  <li><b>Resource allocation:</b> every container declares requests; memory limit equals request, no CPU limit. Namespaces per team/service with ResourceQuota and LimitRange, PodDisruptionBudgets and topology spread across AZs, Pod Security Standards at "restricted".</li>
+  <li><b>Identity and secrets:</b> pods get AWS permissions through EKS Pod Identity, one role per service. Secrets live in Secrets Manager and are synced by External Secrets Operator; Kubernetes secrets are envelope-encrypted with KMS.</li>
+</ul>
+<p><b>Containerization.</b> Multi-stage Dockerfile on a slim Python base, dependencies pinned by lock file, non-root user, read-only filesystem, Gunicorn as the server. Images are tagged with the git SHA, never <code>latest</code>.</p>
+<ul>
+  <li><b>Build (CI, GitHub Actions):</b> lint and tests → image build with layer cache → vulnerability scan that fails on critical findings → SBOM and cosign signature → push. The workflow assumes an AWS role through OIDC, so no long-lived keys exist.</li>
+  <li><b>Registry:</b> one ECR in the shared-services account with immutable tags, scan-on-push, lifecycle rules for old images and cross-account pull for both clusters. The exact image tested in staging is the one promoted to prod.</li>
+  <li><b>Deploy (CD, GitOps with Argo CD):</b> CI commits the new image tag to a config repository (Helm charts). Argo CD in each cluster syncs it: automatically to dev and staging, to prod after an approved pull request. Argo Rollouts shifts traffic gradually and rolls back on error rate. Git is the audit log and the rollback mechanism.</li>
+  <li><b>Frontend:</b> the SPA is built in CI, uploaded to a versioned S3 bucket and the CloudFront cache is invalidated; it needs no cluster capacity.</li>
+</ul>
+
+<h2>4. Database</h2>
+<p><b>MongoDB Atlas on AWS</b>, in the same region as the cluster. The alternatives lose on substance: Amazon DocumentDB
+is a different engine that emulates part of the MongoDB API, so driver and feature incompatibilities surface late;
+self-managing MongoDB on Kubernetes or EC2 makes a small team own upgrades, backups and failover for its most critical
+component. Atlas is run by the vendor, scales from a small replica set to a sharded cluster without migration, and is
+billed through AWS Marketplace.</p>
+<ul>
+  <li><b>Security:</b> reachable only over PrivateLink, with no public endpoint or IP allowlists. Applications authenticate with their IAM role, so there is no database password to leak. Encryption at rest with a customer-managed KMS key, TLS in transit, database auditing on. The most sensitive fields additionally use client-side field-level encryption so they are unreadable even to database administrators.</li>
+  <li><b>High availability:</b> three-node replica set spread over three AZs, automatic failover in seconds, majority write concern and retryable writes in the application. Compute and storage auto-scale; sharding is added when a single replica set is no longer enough.</li>
+  <li><b>Backups:</b> continuous cloud backup with point-in-time restore, plus a snapshot schedule (hourly, daily, weekly, monthly) copied to a second region. A restore into a scratch cluster is rehearsed every quarter; an untested backup is not a backup.</li>
+  <li><b>Disaster recovery:</b> AZ loss is handled automatically by the replica set and the multi-AZ cluster. Region loss: restore the latest snapshot copy in the second region and recreate the stack from Terraform and Git. Initial targets are RPO ≤ 15 minutes and RTO ≤ 4 hours, validated by a yearly exercise. When the business needs minutes, add Atlas nodes and a warm cluster in the second region; the design does not change.</li>
+</ul>
+
+<div class="diagram">
+  <h2>High-level diagram — production (non-prod mirrors it at smaller scale)</h2>
+  <img src="hld.svg" alt="High-level architecture diagram">
+</div>
+
+</body>
+</html>

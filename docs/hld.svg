@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1130 680" font-family="Helvetica, Arial, sans-serif" font-size="11">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#374151"/>
+    </marker>
+    <style>
+      .box { fill: #ffffff; stroke: #374151; stroke-width: 1.2; rx: 5; }
+      .ext { fill: #f3f4f6; stroke: #374151; stroke-width: 1.2; rx: 5; }
+      .account { fill: #fff7ed; stroke: #c2410c; stroke-width: 1.5; rx: 8; }
+      .vpc { fill: #f0fdf4; stroke: #15803d; stroke-width: 1.5; rx: 8; }
+      .public { fill: #dcfce7; stroke: #15803d; stroke-dasharray: 4 3; rx: 5; }
+      .private { fill: #dbeafe; stroke: #1d4ed8; stroke-dasharray: 4 3; rx: 5; }
+      .eks { fill: #eff6ff; stroke: #1d4ed8; stroke-width: 1.5; rx: 6; }
+      .pool { fill: #ffffff; stroke: #1d4ed8; stroke-width: 1; rx: 5; }
+      .atlas { fill: #ecfdf5; stroke: #047857; stroke-width: 1.5; rx: 8; }
+      .line { fill: none; stroke: #374151; stroke-width: 1.4; marker-end: url(#arrow); }
+      .title { font-weight: bold; font-size: 12px; }
+      .small { font-size: 9.5px; fill: #374151; }
+      .c { text-anchor: middle; }
+      .e { text-anchor: end; }
+    </style>
+  </defs>
+
+  <!-- edge -->
+  <rect class="ext" x="20" y="32" width="90" height="46"/>
+  <text class="c title" x="65" y="59">Users</text>
+  <rect class="box" x="150" y="28" width="200" height="54"/>
+  <text class="c title" x="250" y="50">CloudFront + WAF</text>
+  <text class="c small" x="250" y="66">Route 53 · ACM · Shield</text>
+  <path class="line" d="M110,55 H150"/>
+
+  <!-- prod account -->
+  <rect class="account" x="140" y="100" width="650" height="560"/>
+  <text class="title" x="152" y="648" fill="#c2410c">Prod account</text>
+
+  <rect class="box" x="155" y="150" width="140" height="54"/>
+  <text class="c title" x="225" y="172">S3 (private)</text>
+  <text class="c small" x="225" y="188">React SPA assets</text>
+  <path class="line" d="M225,82 V150"/>
+  <text class="small" x="231" y="136">/*</text>
+
+  <rect class="box" x="155" y="300" width="140" height="64"/>
+  <text class="c title" x="225" y="322">Secrets Manager</text>
+  <text class="c small" x="225" y="338">KMS keys</text>
+  <text class="c small" x="225" y="352">(read via Pod Identity)</text>
+
+  <rect class="box" x="155" y="400" width="140" height="64"/>
+  <text class="c title" x="225" y="422">Observability</text>
+  <text class="c small" x="225" y="438">CloudWatch, Managed</text>
+  <text class="c small" x="225" y="452">Prometheus + Grafana</text>
+
+  <!-- vpc -->
+  <rect class="vpc" x="315" y="125" width="460" height="520"/>
+  <text class="title" x="326" y="143" fill="#15803d">VPC 10.20.0.0/16 · 3 AZs</text>
+
+  <rect class="public" x="330" y="155" width="430" height="80"/>
+  <text class="small" x="340" y="171">Public subnets</text>
+  <rect class="box" x="440" y="180" width="160" height="42"/>
+  <text class="c title" x="520" y="205">ALB (API)</text>
+  <rect class="box" x="620" y="180" width="125" height="42"/>
+  <text class="c title" x="682" y="205">NAT gateways</text>
+  <path class="line" d="M350,55 H520 V180"/>
+  <text class="small" x="526" y="108">/api/*</text>
+
+  <rect class="private" x="330" y="255" width="430" height="235"/>
+  <text class="small e" x="750" y="271">Private app subnets</text>
+  <rect class="eks" x="345" y="282" width="400" height="195"/>
+  <text class="title" x="355" y="299" fill="#1d4ed8">EKS cluster</text>
+
+  <rect class="pool" x="355" y="305" width="380" height="100"/>
+  <rect class="box" x="440" y="318" width="160" height="50"/>
+  <text class="c title" x="520" y="339">Flask API pods</text>
+  <text class="c small" x="520" y="355">HPA · PDB · spread over AZs</text>
+  <rect class="box" x="615" y="318" width="110" height="50"/>
+  <text class="c title" x="670" y="339">Workers</text>
+  <text class="c small" x="670" y="355">jobs, cron</text>
+  <text class="small" x="363" y="395">Karpenter NodePools — Graviton, spot + on-demand</text>
+  <path class="line" d="M520,222 V318"/>
+
+  <rect class="pool" x="355" y="415" width="300" height="52"/>
+  <text class="title" x="363" y="434">System node group (on-demand)</text>
+  <text class="small" x="363" y="451">Karpenter · Argo CD · External Secrets · LB controller</text>
+
+  <rect class="private" x="330" y="510" width="430" height="115"/>
+  <text class="small" x="340" y="527">Private data subnets</text>
+  <rect class="box" x="345" y="545" width="200" height="56"/>
+  <text class="c title" x="445" y="568">VPC endpoints</text>
+  <text class="c small" x="445" y="585">ECR · S3 · STS · Logs · Secrets</text>
+  <rect class="box" x="575" y="545" width="170" height="56"/>
+  <text class="c title" x="660" y="568">PrivateLink endpoint</text>
+  <text class="c small" x="660" y="585">to MongoDB Atlas</text>
+  <path class="line" d="M690,405 V545"/>
+  <text class="small" x="696" y="503">TLS + IAM auth</text>
+
+  <!-- CI/CD -->
+  <rect class="ext" x="860" y="28" width="250" height="40"/>
+  <text class="c title" x="985" y="53">Developers</text>
+  <rect class="ext" x="860" y="96" width="250" height="48"/>
+  <text class="c title" x="985" y="116">GitHub</text>
+  <text class="c small" x="985" y="132">app repos + GitOps config repo</text>
+  <rect class="ext" x="860" y="172" width="250" height="56"/>
+  <text class="c title" x="985" y="192">GitHub Actions</text>
+  <text class="c small" x="985" y="207">test · build · scan · sign</text>
+  <text class="c small" x="985" y="220">AWS access via OIDC, no static keys</text>
+  <rect class="account" x="860" y="256" width="250" height="64"/>
+  <text class="c title" x="985" y="277" fill="#c2410c">Shared-services account</text>
+  <text class="c small" x="985" y="293">ECR — immutable tags, image scanning</text>
+  <text class="c small" x="985" y="307">pulled by EKS; Argo CD syncs from Git</text>
+  <path class="line" d="M985,68 V96"/>
+  <path class="line" d="M985,144 V172"/>
+  <path class="line" d="M985,228 V256"/>
+  <path class="line" d="M860,290 H745"/>
+
+  <!-- other accounts -->
+  <rect class="account" x="860" y="346" width="250" height="108"/>
+  <text class="title" x="872" y="365" fill="#c2410c">Other accounts in the Organization</text>
+  <text class="small" x="872" y="384">Management — billing, SSO, SCPs</text>
+  <text class="small" x="872" y="400">Security — CloudTrail, GuardDuty, Config,</text>
+  <text class="small" x="872" y="413">log archive</text>
+  <text class="small" x="872" y="429">Non-prod — dev + staging, same layout,</text>
+  <text class="small" x="872" y="442">smaller and mostly spot</text>
+
+  <!-- atlas -->
+  <rect class="atlas" x="860" y="480" width="250" height="180"/>
+  <text class="title" x="872" y="499" fill="#047857">MongoDB Atlas (same AWS region)</text>
+  <rect class="box" x="876" y="514" width="66" height="44"/>
+  <text class="c title" x="909" y="533" style="font-size:10px">Primary</text>
+  <text class="c small" x="909" y="548">AZ a</text>
+  <rect class="box" x="952" y="514" width="66" height="44"/>
+  <text class="c title" x="985" y="533" style="font-size:10px">Secondary</text>
+  <text class="c small" x="985" y="548">AZ b</text>
+  <rect class="box" x="1028" y="514" width="66" height="44"/>
+  <text class="c title" x="1061" y="533" style="font-size:10px">Secondary</text>
+  <text class="c small" x="1061" y="548">AZ c</text>
+  <text class="small" x="872" y="580">Encrypted with customer KMS key</text>
+  <text class="small" x="872" y="596">Continuous backup with point-in-time restore</text>
+  <rect class="box" x="876" y="610" width="218" height="36"/>
+  <text class="c small" x="985" y="632">Snapshot copies → second region (DR)</text>
+  <path class="line" d="M745,573 H860"/>
+</svg>
