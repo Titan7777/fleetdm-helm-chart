@@ -1,0 +1,32 @@
+name: End-to-end (Makefile on Kind)
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/setup-helm@v4
+
+      # The same targets a user runs locally; kind, kubectl, docker and jq are
+      # preinstalled on the runner.
+      - run: make cluster
+      - run: make install
+      - run: make verify
+      - run: make agent
+
+      - name: Debug on failure
+        if: failure()
+        run: |
+          kubectl --context kind-fleet -n fleet get pods,events
+          kubectl --context kind-fleet -n fleet logs deploy/fleet-fleetdm --all-containers --tail=100
+          docker logs fleet-test-agent || true
+
+      - run: make uninstall

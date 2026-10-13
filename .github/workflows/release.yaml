@@ -1,0 +1,35 @@
+name: Release chart
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "charts/**"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "$GITHUB_ACTOR"
+          git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
+
+      - uses: azure/setup-helm@v4
+
+      # Packages every chart whose version has no release yet, publishes it as
+      # a GitHub Release and updates index.yaml on the gh-pages branch.
+      - uses: helm/chart-releaser-action@v1
+        with:
+          charts_dir: charts
+          skip_existing: true
+        env:
+          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
