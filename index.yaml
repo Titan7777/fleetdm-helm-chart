@@ -1,0 +1,23 @@
+apiVersion: v1
+entries:
+  fleetdm:
+  - apiVersion: v2
+    appVersion: v4.93.0
+    created: "2026-10-13T15:25:40.954147719Z"
+    description: FleetDM server with bundled MySQL and Redis
+    digest: 884e700503483894207b99b7d3aa93f7afc7cf0791ebf04f9e8f8c8469186daa
+    home: https://fleetdm.com
+    keywords:
+    - fleet
+    - fleetdm
+    - osquery
+    - mdm
+    kubeVersion: '>=1.25.0-0'
+    name: fleetdm
+    sources:
+    - https://github.com/fleetdm/fleet
+    type: application
+    urls:
+    - https://github.com/Titan7777/fleetdm-helm-chart/releases/download/fleetdm-0.1.0/fleetdm-0.1.0.tgz
+    version: 0.1.0
+generated: "2026-10-13T15:25:40.954175209Z"
