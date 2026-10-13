@@ -1,0 +1,15 @@
+apiVersion: v2
+name: fleetdm
+description: FleetDM server with bundled MySQL and Redis
+type: application
+version: 0.1.0
+appVersion: "v4.93.0"
+kubeVersion: ">=1.25.0-0"
+keywords:
+  - fleet
+  - fleetdm
+  - osquery
+  - mdm
+home: https://fleetdm.com
+sources:
+  - https://github.com/fleetdm/fleet

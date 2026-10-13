@@ -1,0 +1,130 @@
+nameOverride: ""
+fullnameOverride: ""
+
+imagePullSecrets: []
+
+fleet:
+  image:
+    repository: fleetdm/fleet
+    # Defaults to .Chart.AppVersion
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  # Migrations run in an initContainer and Fleet does not lock them, so scale
+  # up only after the first install has finished.
+  replicaCount: 1
+
+  # Run `fleet prepare db --no-prompt` before the server starts. Idempotent:
+  # a no-op when the schema is already up to date.
+  autoMigrate: true
+
+  # FLEET_SERVER_PRIVATE_KEY, used to encrypt MDM assets at rest. Generated on
+  # first install and kept across upgrades when left empty.
+  privateKey: ""
+  # Existing Secret holding the key under `server-private-key`.
+  existingSecret: ""
+
+  # osquery and fleetd refuse to talk to a plain-HTTP server, so Fleet has to be
+  # served over TLS: either here, or at an ingress / load balancer in front.
+  tls:
+    enabled: true
+    # Existing kubernetes.io/tls Secret. When empty, the chart issues a
+    # self-signed CA and a server certificate signed by it.
+    existingSecret: ""
+    selfSigned:
+      # SANs added on top of the in-cluster Service names.
+      dnsNames:
+        - localhost
+      ipAddresses:
+        - 127.0.0.1
+      validityDays: 825
+
+  service:
+    type: ClusterIP
+    port: 8080
+    # Only used when type is NodePort.
+    nodePort: null
+    annotations: {}
+
+  # Extra FLEET_* settings, see https://fleetdm.com/docs/configuration/fleet-server-configuration
+  extraEnv: []
+  #  - name: FLEET_LOGGING_DEBUG
+  #    value: "true"
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Use when TLS is terminated in front of Fleet; set fleet.tls.enabled=false then.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  host: fleet.example.com
+  tls:
+    enabled: true
+    secretName: fleet-ingress-tls
+
+mysql:
+  # Set to false to point Fleet at an external MySQL (see `external` below).
+  enabled: true
+  image:
+    repository: mysql
+    tag: "8.4"
+    pullPolicy: IfNotPresent
+  auth:
+    database: fleet
+    username: fleet
+    # Generated on first install and kept across upgrades when left empty.
+    password: ""
+    rootPassword: ""
+    # Existing Secret with `mysql-password` (and `mysql-root-password` for the
+    # bundled server).
+    existingSecret: ""
+  external:
+    # host:port
+    address: ""
+  persistence:
+    enabled: true
+    size: 5Gi
+    storageClass: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+redis:
+  # Set to false to point Fleet at an external Redis (see `external` below).
+  enabled: true
+  image:
+    repository: redis
+    tag: "7.4-alpine"
+    pullPolicy: IfNotPresent
+  external:
+    # host:port
+    address: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+# Only Fleet pods may reach MySQL and Redis. Ignored by CNIs without
+# NetworkPolicy support.
+networkPolicy:
+  enabled: true
+
+initImage:
+  repository: busybox
+  tag: "1.37"

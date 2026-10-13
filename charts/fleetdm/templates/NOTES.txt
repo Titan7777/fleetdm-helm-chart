@@ -1,0 +1,20 @@
+Fleet {{ .Chart.AppVersion }} is starting in namespace {{ .Release.Namespace }}.
+
+  kubectl -n {{ .Release.Namespace }} rollout status deploy/{{ include "fleetdm.fullname" . }}
+  helm -n {{ .Release.Namespace }} test {{ .Release.Name }}
+{{ if .Values.ingress.enabled }}
+UI and agent endpoint: http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}
+{{- else if eq .Values.fleet.service.type "NodePort" }}
+UI and agent endpoint: {{ ternary "https" "http" .Values.fleet.tls.enabled }}://<node>:{{ .Values.fleet.service.nodePort | default "<nodePort>" }}
+{{- else }}
+Reach the UI with:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "fleetdm.fullname" . }} 8080:{{ .Values.fleet.service.port }}
+{{- end }}
+{{- if and .Values.fleet.tls.enabled (not .Values.fleet.tls.existingSecret) }}
+
+Fleet serves a certificate signed by a chart-generated CA. Agents need that CA
+to enrol (fleetd: --fleet-certificate, osquery: --tls_server_certs):
+
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "fleetdm.tls.secretName" . }} -o jsonpath='{.data.ca\.crt}' | base64 -d > fleet-ca.crt
+{{- end }}

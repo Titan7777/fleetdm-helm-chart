@@ -1,0 +1,136 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fleetdm.fullname" . }}
+  labels:
+    {{- include "fleetdm.labels" . | nindent 4 }}
+    app.kubernetes.io/component: fleet
+spec:
+  replicas: {{ .Values.fleet.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "fleetdm.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: fleet
+  template:
+    metadata:
+      labels:
+        {{- include "fleetdm.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: fleet
+      {{- with .Values.fleet.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 100
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: wait-for-deps
+          image: "{{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}"
+          command:
+            - sh
+            - -c
+            - |
+              for addr in "$FLEET_MYSQL_ADDRESS" "$FLEET_REDIS_ADDRESS"; do
+                until nc -z -w 2 "${addr%:*}" "${addr##*:}"; do
+                  echo "waiting for $addr"
+                  sleep 2
+                done
+              done
+          env:
+            - name: FLEET_MYSQL_ADDRESS
+              value: {{ include "fleetdm.mysql.address" . | quote }}
+            - name: FLEET_REDIS_ADDRESS
+              value: {{ include "fleetdm.redis.address" . | quote }}
+          securityContext:
+            {{- include "fleetdm.containerSecurityContext" . | nindent 12 }}
+        {{- if .Values.fleet.autoMigrate }}
+        - name: prepare-db
+          image: "{{ .Values.fleet.image.repository }}:{{ .Values.fleet.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.fleet.image.pullPolicy }}
+          command: ["fleet", "prepare", "db", "--no-prompt"]
+          env:
+            {{- include "fleetdm.env" . | nindent 12 }}
+          securityContext:
+            {{- include "fleetdm.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+        {{- end }}
+      containers:
+        - name: fleet
+          image: "{{ .Values.fleet.image.repository }}:{{ .Values.fleet.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.fleet.image.pullPolicy }}
+          command: ["fleet", "serve"]
+          env:
+            {{- include "fleetdm.env" . | nindent 12 }}
+          ports:
+            - name: fleet
+              containerPort: 8080
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: fleet
+              scheme: {{ ternary "HTTPS" "HTTP" .Values.fleet.tls.enabled }}
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: fleet
+              scheme: {{ ternary "HTTPS" "HTTP" .Values.fleet.tls.enabled }}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: fleet
+              scheme: {{ ternary "HTTPS" "HTTP" .Values.fleet.tls.enabled }}
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.fleet.resources | nindent 12 }}
+          securityContext:
+            {{- include "fleetdm.containerSecurityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if .Values.fleet.tls.enabled }}
+            - name: tls
+              mountPath: /etc/fleet/tls
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.fleet.tls.enabled }}
+        - name: tls
+          secret:
+            secretName: {{ include "fleetdm.tls.secretName" . }}
+            defaultMode: 0440
+        {{- end }}
+      {{- with .Values.fleet.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.fleet.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.fleet.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
