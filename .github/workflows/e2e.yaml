@@ -27,6 +27,8 @@ jobs:
         run: |
           kubectl --context kind-fleet -n fleet get pods,events
           kubectl --context kind-fleet -n fleet logs deploy/fleet-fleetdm --all-containers --tail=100
+          kubectl --context kind-fleet -n fleet logs sts/fleet-fleetdm-mysql --tail=60
+          kubectl --context kind-fleet -n fleet exec sts/fleet-fleetdm-mysql -- sh -c 'ls -la /var/run/mysqld/; id; ps aux 2>/dev/null | head' || true
           docker logs fleet-test-agent || true
 
       - run: make uninstall
